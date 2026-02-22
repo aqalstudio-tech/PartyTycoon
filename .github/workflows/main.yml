@@ -1,0 +1,30 @@
+name: Sync appads txt File
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  
+jobs:
+  sync-file:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout your repo
+        uses: actions/checkout@v4
+
+      - name: Fetch external file
+        run: |
+          mkdir -p synced
+          curl -L  https://raw.githubusercontent.com/cleveradssolutions/App-ads.txt/main/app-ads.txt \
+            -o app-ads.txt
+      - name: Commit & Push if changed
+        run: |
+          git config --global user.email "aqal.studio@gmail.com"         
+          git config --global user.name "github-actions[bot]"
+          git add app-ads.txt
+          git diff --cached --quiet || git commit -m "Auto-sync: Update file.txt from external repo"
+          git remote set-url origin https://x-access-token:${{secrets.cas}}@github.com/aqalstudio-tech/PartyTycoon.git
+          git push origin main
