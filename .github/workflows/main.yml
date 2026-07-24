@@ -1,30 +1,62 @@
-name: Sync appads txt File
+name: Sync appads.txt and Deploy Pages
 
 on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+
 permissions:
   contents: write
-  
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  sync-file:
+  sync-and-deploy:
     runs-on: ubuntu-latest
 
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - name: Checkout your repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Fetch external file
+      - name: Fetch external app-ads.txt
         run: |
-          mkdir -p synced
-          curl -L  https://raw.githubusercontent.com/cleveradssolutions/App-ads.txt/main/app-ads.txt \
+          curl -L \
+            https://raw.githubusercontent.com/cleveradssolutions/App-ads.txt/main/app-ads.txt \
             -o app-ads.txt
-      - name: Commit & Push if changed
+
+      - name: Commit changes if needed
+        id: commit
         run: |
-          git config --global user.email "aqal.studio@gmail.com"         
+          git config --global user.email "aqal.studio@gmail.com"
           git config --global user.name "github-actions[bot]"
+
           git add app-ads.txt
-          git diff --cached --quiet || git commit -m "Auto-sync: Update file.txt from external repo"
-          git remote set-url origin https://x-access-token:${{secrets.cas}}@github.com/aqalstudio-tech/PartyTycoon.git
-          git push origin main
+
+          if git diff --cached --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            git commit -m "Auto-sync: Update app-ads.txt"
+            git remote set-url origin https://x-access-token:${{ secrets.cas }}@github.com/aqalstudio-tech/PartyTycoon.git
+            git push origin main
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
